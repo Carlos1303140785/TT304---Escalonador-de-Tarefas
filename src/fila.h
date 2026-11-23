@@ -16,4 +16,10 @@ FilaPrioridade *fila_criar(int capacidade);
 /* destroi a fila e as tarefas que ainda estiverem nela */
 void fila_destruir(FilaPrioridade *fila);
 
+/* insere em ordem de tempo e devolve zero ou menos um se cheia */
+int fila_inserir_ordenado(FilaPrioridade *fila, Task *tarefa);
+
+/* remove a tarefa de maior prioridade ou devolve NULL se vazia */
+Task *fila_remover_primeiro(FilaPrioridade *fila);
+
 #endif
