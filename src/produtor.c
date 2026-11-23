@@ -1,8 +1,31 @@
 /* implementacao do thread produtor */
 #include <stdio.h>
+#include <stdlib.h>
 #include "produtor.h"
 
-/* insere uma sentinela por consumidor e devolve o numero de falhas */
+/* Insere de forma estavel: tarefas de mesma duracao mantem FIFO. */
+static void inserir_ordenado(Task **inicio, Task *tarefa)
+{
+    Task **posicao = inicio;
+
+    while (*posicao != NULL &&
+           (*posicao)->tempo_execucao <= tarefa->tempo_execucao) {
+        posicao = &(*posicao)->proximo;
+    }
+    tarefa->proximo = *posicao;
+    *posicao = tarefa;
+}
+
+static void liberar_lista(Task *inicio)
+{
+    while (inicio != NULL) {
+        Task *proxima = inicio->proximo;
+        task_destruir(inicio);
+        inicio = proxima;
+    }
+}
+
+/* Insere uma sentinela por consumidor e devolve o numero de falhas. */
 static int enfileirar_sentinelas(ArgsProdutor *a)
 {
     int falhas = 0;
@@ -21,40 +44,60 @@ static int enfileirar_sentinelas(ArgsProdutor *a)
 void *produtor_thread(void *arg)
 {
     ArgsProdutor *a = arg;
+    Task *tarefas = NULL;
     a->status = 0;
 
     FILE *f = fopen(a->arquivo, "r");
     if (f == NULL) {
-        perror("Produtor: não foi possível abrir o arquivo de entrada");
+        perror("Produtor: nao foi possivel abrir o arquivo de entrada");
         a->status = 1;
     } else {
         int id, tempo;
         int linha = 0;
         int lidos;
 
+        /* Lê todas as tarefas antes de liberar qualquer uma aos consumidores.
+         * Isso permite que a primeira retirada considere prioridades do arquivo
+         * inteiro, sem aumentar a capacidade da fila compartilhada.
+         */
         while ((lidos = fscanf(f, "%d %d", &id, &tempo)) == 2) {
             linha++;
-
-            /* linha invalida e ignorada e o programa segue */
             Task *t = task_criar(id, tempo);
             if (t == NULL) {
-                fprintf(stderr, "Produtor: entrada %d ignorada "
-                                "(valores inválidos ou sem memória).\n", linha);
+                fprintf(stderr, "Produtor: entrada %d invalida ou sem memoria.\n", linha);
                 a->status = 1;
                 continue;
             }
-            fila_inserir(a->fila, t);
-            printf("Produtor: tarefa %d alocada e enfileirada.\n", id);
-            fflush(stdout);
+            inserir_ordenado(&tarefas, t);
         }
         if (lidos != EOF) {
-            fprintf(stderr, "Produtor: formato inválido após a entrada %d.\n", linha);
+            fprintf(stderr, "Produtor: formato invalido apos a entrada %d.\n", linha);
             a->status = 1;
         }
         fclose(f);
     }
 
-    /* as sentinelas sempre saem para os consumidores nao ficarem presos */
+    /* Transfere a lista ordenada para a bounded buffer. Se houver mais tarefas
+     * que vagas, fila_inserir bloqueia ate um consumidor remover uma tarefa.
+     */
+    while (tarefas != NULL) {
+        Task *t = tarefas;
+        tarefas = t->proximo;
+        t->proximo = NULL;
+
+        if (fila_inserir(a->fila, t) != 0) {
+            fprintf(stderr, "Produtor: erro ao enfileirar tarefa %d.\n", t->id);
+            task_destruir(t);
+            a->status = 1;
+            liberar_lista(tarefas);
+            tarefas = NULL;
+            break;
+        }
+        printf("Produtor: tarefa %d alocada e enfileirada.\n", t->id);
+        fflush(stdout);
+    }
+
+    /* As sentinelas possuem duracao INT_MAX e entram depois das tarefas reais. */
     if (enfileirar_sentinelas(a) != 0)
         a->status = 1;
     return NULL;
