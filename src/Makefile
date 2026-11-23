@@ -5,7 +5,7 @@ CC        ?= gcc
 MAX_TASKS ?= 20
 CFLAGS    := -std=c11 -D_POSIX_C_SOURCE=200809L -O2 -g -pthread \
              -Wall -Wextra -Wpedantic -DMAX_TASKS=$(MAX_TASKS)
-SRC_DIR   := src
+SRC_DIR   := ./
 BUILD_DIR := build
 LIB_SRC   := $(SRC_DIR)/task.c $(SRC_DIR)/fila.c $(SRC_DIR)/produtor.c $(SRC_DIR)/consumidor.c
 APP_SRC   := $(LIB_SRC) $(SRC_DIR)/main.c
