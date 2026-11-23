@@ -1,5 +1,3 @@
-# makefile do escalonador de tarefas
-# alvos all asan tsan test e clean
 
 CC        ?= gcc
 MAX_TASKS ?= 20
@@ -11,7 +9,7 @@ LIB_SRC   := $(SRC_DIR)/task.c $(SRC_DIR)/fila.c $(SRC_DIR)/produtor.c $(SRC_DIR
 APP_SRC   := $(LIB_SRC) $(SRC_DIR)/main.c
 HEADERS   := $(wildcard $(SRC_DIR)/*.h)
 
-.PHONY: all asan tsan test clean
+.PHONY: all asan tsan clean
 
 all: escalonador
 
@@ -27,4 +25,4 @@ tsan: $(APP_SRC) $(HEADERS)
 	$(CC) $(CFLAGS) -fsanitize=thread $(APP_SRC) -o escalonador
 
 clean:
-	rm -rf escalonador test_fila $(BUILD_DIR)
+	rm -rf escalonador $(BUILD_DIR)
